@@ -3,6 +3,9 @@ package handler
 import (
 	"log"
 	"net/http"
+	"os"
+
+	"tinytelegram/gateway/store"
 
 	"github.com/gorilla/websocket"
 )
@@ -27,14 +30,26 @@ func WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	log.Printf("User %s connected", userID)
+	// register user presence in Redis
+	gatewayAddr := os.Getenv("GATEWAY_ADDR")
+	if err := store.RegisterUser(userID, gatewayAddr); err != nil {
+		log.Printf("Failed to register user %s: %v", userID, err)
+	}
+	log.Printf("User %s connected to gateway %s", userID, gatewayAddr)
+
+	defer func() {
+		store.UnregisterUser(userID)
+		log.Printf("User %s disconnected", userID)
+	}()
 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("User %s disconnected: %v", userID, err)
 			break
 		}
 		log.Printf("Message from %s: %s", userID, msg)
+
+		// echo back for now, gRPC routing comes next
+		conn.WriteMessage(websocket.TextMessage, msg)
 	}
 }
