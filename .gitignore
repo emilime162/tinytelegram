@@ -24,3 +24,6 @@ docs/plans/
 # Large k6 CSV output and logs
 results/**/*_k6.csv
 results/**/run_all.log
+
+# Claude setting
+.claude/
