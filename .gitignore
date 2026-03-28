@@ -21,6 +21,6 @@ docs/plans/
 .ssh-key-*
 *.pem
 
-# Large experiment CSV files
-results/**/*.csv
+# Large k6 CSV output and logs
+results/**/*_k6.csv
 results/**/run_all.log
