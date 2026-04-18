@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/redis/go-redis/v9"
@@ -20,6 +21,25 @@ func testRDB(t *testing.T) *redis.Client {
 	}
 	rdb.FlushDB(context.Background())
 	return rdb
+}
+
+func TestInitRedis_WithAuthRequired(t *testing.T) {
+	// Spin up a Redis with requirepass set to verify InitRedis honors REDIS_AUTH.
+	// Preflight:
+	//   docker run --rm -d --name tt-redis-auth -p 16380:6379 \
+	//     redis:7 redis-server --requirepass testpass
+	if os.Getenv("TT_REDIS_AUTH_TEST") != "1" {
+		t.Skip("set TT_REDIS_AUTH_TEST=1 and run a redis with requirepass=testpass on localhost:16380")
+	}
+	os.Setenv("REDIS_ADDR", "localhost:16380")
+	os.Setenv("REDIS_AUTH", "testpass")
+	defer os.Unsetenv("REDIS_ADDR")
+	defer os.Unsetenv("REDIS_AUTH")
+
+	InitRedis() // must not Fatalf
+	if err := RDB.Ping(context.Background()).Err(); err != nil {
+		t.Fatalf("ping after InitRedis with AUTH: %v", err)
+	}
 }
 
 func TestAllocatePTSWithWait_HappyPath_NoReplicas(t *testing.T) {

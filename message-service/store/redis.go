@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log"
@@ -21,15 +22,20 @@ func InitRedis() {
 	if addr == "" {
 		addr = "localhost:6379"
 	}
+	opts := &redis.Options{
+		Addr:     addr,
+		Password: os.Getenv("REDIS_AUTH"), // empty for local un-authenticated Redis
+	}
+	if os.Getenv("REDIS_TLS") == "true" {
+		// ElastiCache in-transit encryption presents a valid cert signed by AWS CA.
+		// We rely on system root CAs; no custom CA pinning needed for this project scope.
+		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
 
-	RDB = redis.NewClient(&redis.Options{
-		Addr: addr,
-	})
-
+	RDB = redis.NewClient(opts)
 	if err := RDB.Ping(context.Background()).Err(); err != nil {
 		log.Fatalf("Redis connection failed: %v", err)
 	}
-
 	log.Println("Redis connected")
 }
 
