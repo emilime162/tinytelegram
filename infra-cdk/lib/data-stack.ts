@@ -54,8 +54,8 @@ export class DataStack extends cdk.Stack {
     this.redisSg = new ec2.SecurityGroup(this, 'RedisSg', { vpc, description: 'tt redis',    allowAllOutbound: false });
     this.appSg = new ec2.SecurityGroup(this, 'AppSg',   { vpc, description: 'tt app tasks', allowAllOutbound: true  });
 
-    this.dbSg.addIngressRule(this.appSg,    ec2.Port.tcp(5432), 'app → rds');
-    this.redisSg.addIngressRule(this.appSg, ec2.Port.tcp(6379), 'app → redis');
+    this.dbSg.addIngressRule(this.appSg,    ec2.Port.tcp(5432), 'app to rds');
+    this.redisSg.addIngressRule(this.appSg, ec2.Port.tcp(6379), 'app to redis');
 
     // RDS and ElastiCache resources added in Tasks 8 and 9.
     this.dbCluster = new rds.DatabaseInstance(this, 'Db', {
@@ -101,10 +101,19 @@ export class DataStack extends cdk.Stack {
       securityGroupIds: [this.redisSg.securityGroupId],
       transitEncryptionEnabled: true,
       atRestEncryptionEnabled: true,
-      authToken: this.redisAuth.secretValueFromJson('token').unsafeUnwrap(),
+      // NOTE: AuthToken must be a LITERAL dynamic-reference string in the CF
+      // template. Using `this.redisAuth.secretValueFromJson(...)` synthesizes
+      // as `Fn::Join`, which CloudFormation does NOT re-interpret as a
+      // dynamic reference → ElastiCache rejects it ("Invalid AuthToken").
+      // Passing the literal secret name to SecretValue.secretsManager()
+      // produces a single literal string that CF resolves correctly.
+      authToken: cdk.SecretValue.secretsManager('tinytelegram/redis', { jsonField: 'token' }).unsafeUnwrap(),
       snapshotRetentionLimit: 1,
     });
     this.redisGroup.addDependency(subnetGroup);
+    // CDK can't infer dependency from a literal-string dynamic reference,
+    // so wire it explicitly.
+    this.redisGroup.node.addDependency(this.redisAuth);
 
     new cdk.CfnOutput(this, 'RedisPrimaryEndpoint', { value: this.redisGroup.attrPrimaryEndPointAddress });
     new cdk.CfnOutput(this, 'RedisAuthSecretArn',   { value: this.redisAuth.secretArn });
