@@ -3,10 +3,10 @@
 -- causing INSERT to fail and message-service to return codes.Unavailable to the client.
 DO $$ BEGIN
     ALTER TABLE messages ADD CONSTRAINT uniq_receiver_pts UNIQUE (receiver_id, receiver_pts);
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
 END $$;
 
 DO $$ BEGIN
     ALTER TABLE messages ADD CONSTRAINT uniq_sender_pts UNIQUE (sender_id, sender_pts);
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
 END $$;
