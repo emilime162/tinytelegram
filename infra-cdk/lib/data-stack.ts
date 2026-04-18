@@ -58,7 +58,31 @@ export class DataStack extends cdk.Stack {
     this.redisSg.addIngressRule(this.appSg, ec2.Port.tcp(6379), 'app → redis');
 
     // RDS and ElastiCache resources added in Tasks 8 and 9.
-    this.dbCluster = undefined as unknown as rds.DatabaseInstance;  // filled in Task 8
+    this.dbCluster = new rds.DatabaseInstance(this, 'Db', {
+      engine: rds.DatabaseInstanceEngine.postgres({
+        version: rds.PostgresEngineVersion.of(cfg.rdsEngineVersion, cfg.rdsEngineVersion.split('.')[0]),
+      }),
+      instanceType: new ec2.InstanceType(cfg.rdsInstanceClass.replace('db.', '')),
+      allocatedStorage: cfg.rdsAllocatedStorageGb,
+      storageType: rds.StorageType.GP3,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      securityGroups: [this.dbSg],
+      multiAz: true,
+      credentials: rds.Credentials.fromSecret(this.dbSecret),
+      databaseName: 'tinytelegram',
+      backupRetention: cdk.Duration.days(7),
+      deletionProtection: false, // school project; simplify teardown
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      enablePerformanceInsights: true,
+      performanceInsightRetention: rds.PerformanceInsightRetention.DEFAULT,
+      monitoringInterval: cdk.Duration.seconds(1), // enhanced monitoring at 1s
+      cloudwatchLogsExports: ['postgresql'],
+    });
+
+    new cdk.CfnOutput(this, 'DbEndpoint', { value: this.dbCluster.dbInstanceEndpointAddress });
+    new cdk.CfnOutput(this, 'DbSecretArn', { value: this.dbSecret.secretArn });
+
     this.redisGroup = undefined as unknown as elasticache.CfnReplicationGroup;  // filled in Task 9
   }
 }
