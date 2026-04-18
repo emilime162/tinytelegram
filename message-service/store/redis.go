@@ -28,8 +28,15 @@ func InitRedis() {
 	}
 	if os.Getenv("REDIS_TLS") == "true" {
 		// ElastiCache in-transit encryption presents a valid cert signed by AWS CA.
-		// We rely on system root CAs; no custom CA pinning needed for this project scope.
-		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		// Rely on system root CAs by default.
+		tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
+		// When tunneling via SSM/bastion, clients reach Redis as
+		// localhost:<port>; SNI/hostname validation against the ElastiCache
+		// endpoint cert will fail. Gate skip behind an explicit env.
+		if os.Getenv("REDIS_TLS_INSECURE") == "true" {
+			tlsCfg.InsecureSkipVerify = true
+		}
+		opts.TLSConfig = tlsCfg
 	}
 
 	RDB = redis.NewClient(opts)

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
@@ -20,11 +21,21 @@ func InitRedis() {
 	if addr == "" {
 		addr = "localhost:6379"
 	}
+	opts := &redis.Options{
+		Addr:     addr,
+		Password: os.Getenv("REDIS_AUTH"),
+	}
+	if os.Getenv("REDIS_TLS") == "true" {
+		tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
+		// SSM/bastion tunnel makes Redis appear on localhost; hostname
+		// verification would fail against the real ElastiCache cert.
+		if os.Getenv("REDIS_TLS_INSECURE") == "true" {
+			tlsCfg.InsecureSkipVerify = true
+		}
+		opts.TLSConfig = tlsCfg
+	}
 
-	RDB = redis.NewClient(&redis.Options{
-		Addr: addr,
-	})
-
+	RDB = redis.NewClient(opts)
 	if err := RDB.Ping(context.Background()).Err(); err != nil {
 		log.Fatalf("Redis connection failed: %v", err)
 	}
