@@ -74,7 +74,7 @@ class TinyTelegramClient {
 
         // Update info bar
         document.getElementById('info-user').textContent = this.userId;
-        document.getElementById('info-gateway').textContent = this.gatewayUrl.replace('ws://', '');
+        document.getElementById('info-gateway').textContent = this.gatewayUrl.replace(/^wss?:\/\//, '');
         document.getElementById('info-pts').textContent = this.localPts;
 
         // Add system message
