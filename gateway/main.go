@@ -14,11 +14,24 @@ import (
 func main() {
 	store.InitRedis()
 
+	grpcPort := os.Getenv("GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = "9000"
+	}
+
 	gatewayAddr := os.Getenv("GATEWAY_ADDR")
 	grpcAddr := os.Getenv("GATEWAY_GRPC_ADDR")
-	if grpcAddr == "" {
+	if metaURI := os.Getenv("ECS_CONTAINER_METADATA_URI_V4"); metaURI != "" {
+		id, addr, err := ResolveSelfAddr(metaURI, grpcPort)
+		if err != nil {
+			log.Fatalf("ECS metadata resolution failed: %v", err)
+		}
+		gatewayAddr, grpcAddr = id, addr
+		log.Printf("ECS self-identity: id=%s grpc=%s", gatewayAddr, grpcAddr)
+	} else if grpcAddr == "" {
 		grpcAddr = gatewayAddr
 	}
+
 	if gatewayAddr != "" && grpcAddr != "" {
 		if err := store.RegisterGateway(gatewayAddr, grpcAddr); err != nil {
 			log.Printf("Failed to register gateway %s: %v", gatewayAddr, err)
@@ -36,10 +49,6 @@ func main() {
 	}
 	msgclient.Init(msgSvcAddr)
 
-	grpcPort := os.Getenv("GRPC_PORT")
-	if grpcPort == "" {
-		grpcPort = "9000"
-	}
 	go ggrpc.StartGRPCServer(grpcPort)
 
 	port := os.Getenv("PORT")
